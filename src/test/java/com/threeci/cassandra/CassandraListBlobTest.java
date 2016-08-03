@@ -1,29 +1,18 @@
 package com.threeci.cassandra;
 
-import com.google.common.collect.ImmutableList;
-
-import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.ColumnDefinitions;
-import com.datastax.driver.core.ProtocolVersion;
-import com.datastax.driver.core.ResultSet;
-import com.datastax.driver.core.Row;
-import com.datastax.driver.core.Session;
+import com.datastax.driver.core.*;
 import com.datastax.driver.core.querybuilder.Batch;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.datastax.driver.core.querybuilder.Select;
-
+import com.datastax.driver.core.utils.Bytes;
+import com.google.common.collect.ImmutableList;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -69,19 +58,11 @@ public class CassandraListBlobTest {
 
 
   @Test
-  public void shouldThrownAStreamCorruptedException() {
-    List<ByteBuffer> list = insertElementsQueryAndReturnList();
-    // Deserialize straight from cassandra returns extra 8 bytes that make this fail
-    Integer actualOne = SerializationUtils.deserialize(list.get(0).array());
-  }
-
-  @Test
-  public void shouldDeserializeAfterCleanUpBytesFromCassandra() {
+  public void shouldDeserializeBytesFromCassandra() {
     List<ByteBuffer> list = insertElementsQueryAndReturnList();
 
-    Integer actualOne = SerializationUtils.deserialize(fixBytesForCassandra(list.get(0).array()));
+    Integer actualOne = SerializationUtils.deserialize(Bytes.getArray(list.get(0)));
     assertThat(actualOne, is(ONE));
-
   }
 
   @Test
@@ -91,7 +72,7 @@ public class CassandraListBlobTest {
     List<Integer> actualList = new ArrayList<>();
 
     list.forEach(i -> {
-      byte[] fixedBytes = fixBytesForCassandra(i.array());
+      byte[] fixedBytes = Bytes.getArray(i);
       actualList.add(SerializationUtils.deserialize(fixedBytes));
     });
 
@@ -127,11 +108,6 @@ public class CassandraListBlobTest {
     List<ByteBuffer> list = queryForObject(resultSet, List.class);
     assertThat(list.size(), is(2));
     return list;
-  }
-
-
-  private byte[] fixBytesForCassandra(byte[] src) {
-    return Arrays.copyOfRange(src, 8, src.length);
   }
 
   private <T> T queryForObject(ResultSet resultSet, Class<T> requiredType) {
